@@ -1,6 +1,6 @@
 id: dap.meeting_assistant
 name: Meeting Assistant
-version: 1.0.0
+version: 1.0.1
 manifest_version: 2
 entry: dap_meeting_assistant.plugin:activate
 description: 화상회의 실시간 전사·한국어 번역·AI 답변 추천·회의 리포트 (영어 미팅 도우미)
@@ -11,3 +11,5 @@ permissions:
   - meeting.capture
   - storage.private
   - window.palette
+execution_modes:
+  - user

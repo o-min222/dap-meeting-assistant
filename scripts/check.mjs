@@ -1,8 +1,8 @@
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
-const root = resolve(import.meta.dirname, "..");
+const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const manifestPath = resolve(root, "plugin.yaml");
 const modulePath = resolve(root, "dap_meeting_assistant/plugin.mjs");
 const palettePath = resolve(root, "palette/index.html");
@@ -14,7 +14,7 @@ for (const file of [manifestPath, modulePath, palettePath]) {
 const manifest = readFileSync(manifestPath, "utf8");
 for (const expected of [
   "id: dap.meeting_assistant",
-  "version: 1.0.0",
+  "version: 1.0.1",
   "entry: dap_meeting_assistant.plugin:activate",
   "min_app_version: 1.3.11",
   "  - meeting.capture",
@@ -23,8 +23,8 @@ for (const expected of [
 ]) {
   if (!manifest.includes(expected)) throw new Error(`manifest contract is missing: ${expected}`);
 }
-if (manifest.includes("execution_modes:") || manifest.includes("  - builtin")) {
-  throw new Error("external plugin manifest must not declare builtin execution");
+if (!manifest.includes("execution_modes:") || !manifest.includes("  - user") || manifest.includes("  - builtin")) {
+  throw new Error("external plugin manifest must declare user execution only");
 }
 
 const pluginModule = await import(pathToFileURL(modulePath).href);
