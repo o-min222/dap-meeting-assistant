@@ -1,0 +1,323 @@
+<!doctype html>
+<!-- DAP Meeting Assistant external plugin palette. -->
+<meta charset="utf-8" />
+<style>
+  :root {
+    --bg: #16181d; --panel: #1f232b; --line: #2c313b; --text: #e8eaef;
+    --dim: #9aa3b2; --me: #4f8cff; --peer: #3ddc97; --accent: #ffd54d; --danger: #ff6b6b;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; font: 13px/1.5 -apple-system, "Apple SD Gothic Neo", system-ui, sans-serif;
+    background: var(--bg); color: var(--text); height: 100vh; display: flex; flex-direction: column;
+    border-radius: 12px; overflow: hidden;
+  }
+  header {
+    display: flex; align-items: center; gap: 8px; padding: 10px 12px;
+    background: var(--panel); border-bottom: 1px solid var(--line); -webkit-app-region: drag;
+  }
+  header button { -webkit-app-region: no-drag; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--dim); flex: none; }
+  .dot.live { background: var(--danger); box-shadow: 0 0 6px var(--danger); }
+  .title { font-weight: 700; flex: 1; }
+  .tabs { display: flex; gap: 2px; padding: 6px 8px 0; background: var(--panel); }
+  .tab {
+    padding: 6px 12px; border: 0; border-radius: 8px 8px 0 0; background: transparent;
+    color: var(--dim); cursor: pointer; font: inherit;
+  }
+  .tab.on { background: var(--bg); color: var(--text); font-weight: 700; }
+  main { flex: 1; overflow-y: auto; padding: 10px 12px; }
+  button.act {
+    border: 1px solid var(--line); background: #262b34; color: var(--text);
+    border-radius: 8px; padding: 6px 10px; cursor: pointer; font: inherit;
+  }
+  button.act:hover { background: #2f3541; }
+  button.primary { background: var(--me); border-color: var(--me); font-weight: 700; }
+  button.stop { background: var(--danger); border-color: var(--danger); font-weight: 700; }
+  .row { display: flex; gap: 6px; flex-wrap: wrap; }
+  .line { padding: 7px 9px; border-radius: 10px; margin-bottom: 8px; background: var(--panel); }
+  .line .who { font-size: 11px; font-weight: 700; margin-bottom: 2px; }
+  .line.me .who { color: var(--me); }
+  .line.peer .who { color: var(--peer); }
+  .line .ko { color: var(--accent); margin-top: 3px; }
+  .hint { color: var(--dim); text-align: center; margin-top: 30px; white-space: pre-line; }
+  .card {
+    border: 1px solid var(--line); background: var(--panel); border-radius: 10px;
+    padding: 10px; margin-top: 8px; white-space: pre-wrap;
+  }
+  .card .ko { color: var(--accent); margin-top: 6px; }
+  .card .tools { margin-top: 8px; display: flex; gap: 6px; }
+  footer { padding: 8px 12px; border-top: 1px solid var(--line); background: var(--panel); }
+  .summary { color: var(--accent); font-size: 12px; margin-top: 6px; white-space: pre-wrap; }
+  .notice { color: var(--dim); font-size: 12px; padding: 6px 9px; }
+  .error { color: var(--danger); font-size: 12px; padding: 6px 9px; white-space: pre-wrap; }
+  .report-item {
+    padding: 9px; border: 1px solid var(--line); border-radius: 10px; margin-bottom: 8px;
+    cursor: pointer; background: var(--panel);
+  }
+  .report-item:hover { background: #262b34; }
+  .report-body { white-space: pre-wrap; }
+  .report-body h { display: block; font-weight: 700; color: var(--accent); margin: 10px 0 4px; }
+  .spin { color: var(--dim); font-size: 12px; padding: 6px 9px; }
+  .langbar {
+    display: flex; gap: 12px; align-items: center; padding: 6px 12px;
+    background: var(--panel); border-bottom: 1px solid var(--line);
+    color: var(--dim); font-size: 12px;
+  }
+  .langbar label { display: flex; gap: 5px; align-items: center; }
+  .langbar select {
+    background: #262b34; color: var(--text); border: 1px solid var(--line);
+    border-radius: 6px; padding: 3px 6px; font: inherit;
+  }
+</style>
+
+<header>
+  <div class="dot" id="dot"></div>
+  <div class="title">회의 어시스턴트</div>
+  <button class="act primary" id="toggle">● 시작</button>
+  <button class="act" id="close">✕</button>
+</header>
+
+<div class="tabs">
+  <button class="tab on" data-tab="live">라이브</button>
+  <button class="tab" data-tab="reports">리포트</button>
+</div>
+
+<div class="langbar" id="langbar" title="인식: 회의 음성 인식 · 출력: 동의/반박 등 예상 답변을 생성할 언어(상대에게 말할 언어)">
+  <label>인식
+    <select id="lang-src">
+      <option value="auto">자동 감지</option>
+      <option value="en">영어</option>
+      <option value="ko">한국어</option>
+      <option value="ja">일본어</option>
+      <option value="zh">중국어</option>
+    </select>
+  </label>
+  <label>출력
+    <select id="lang-reply">
+      <option value="auto">자동 (회의 언어)</option>
+      <option value="en">영어</option>
+      <option value="ko">한국어</option>
+      <option value="ja">일본어</option>
+      <option value="zh">중국어</option>
+    </select>
+  </label>
+</div>
+
+<main id="view-live">
+  <div class="hint" id="hint">● 시작을 누르면 회의 음성을 실시간 전사해요.
+
+인식 = 상대 발화 언어, 출력 = 내가 말할
+예상 답변(동의/반박/질문/제안) 언어예요.
+언어가 다른 미팅에서 바로 쓸 문장을 받아보세요.</div>
+  <div id="lines"></div>
+  <div id="msgs"></div>
+</main>
+
+<main id="view-reports" style="display:none">
+  <div id="report-list"></div>
+  <div id="report-view" class="report-body"></div>
+</main>
+
+<footer>
+  <div class="row">
+    <button class="act" data-stance="agree">👍 동의</button>
+    <button class="act" data-stance="counter">🤔 반박</button>
+    <button class="act" data-stance="question">❓ 질문</button>
+    <button class="act" data-stance="propose">💡 제안</button>
+    <button class="act" id="summarize" style="margin-left:auto">요약</button>
+  </div>
+  <div class="summary" id="summary"></div>
+  <div id="suggestion"></div>
+</footer>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+  let running = false;
+
+  const setRunning = (on) => {
+    running = on;
+    $("dot").className = "dot" + (on ? " live" : "");
+    const b = $("toggle");
+    b.textContent = on ? "■ 종료" : "● 시작";
+    b.className = "act " + (on ? "stop" : "primary");
+  };
+
+  const addLine = (line) => {
+    $("hint").style.display = "none";
+    const el = document.createElement("div");
+    el.className = "line " + line.speaker;
+    el.id = "line-" + line.id;
+    el.innerHTML = '<div class="who"></div><div class="txt"></div><div class="ko" style="display:none"></div>';
+    el.querySelector(".who").textContent = line.speaker === "me" ? "나" : "상대";
+    el.querySelector(".txt").textContent = line.text;
+    if (line.translation) {
+      const ko = el.querySelector(".ko");
+      ko.textContent = line.translation;
+      ko.style.display = "";
+    }
+    $("lines").append(el);
+    el.scrollIntoView({ block: "end" });
+  };
+
+  const showMsg = (cls, text) => {
+    const el = document.createElement("div");
+    el.className = cls;
+    el.textContent = text;
+    $("msgs").append(el);
+    el.scrollIntoView({ block: "end" });
+    setTimeout(() => el.remove(), 15000);
+  };
+
+  const renderReport = (report) => {
+    $("report-list").style.display = "none";
+    const view = $("report-view");
+    view.innerHTML = "";
+    const title = document.createElement("h");
+    title.textContent = report.title;
+    view.append(title);
+    for (const raw of String(report.body).split("\n")) {
+      if (raw.startsWith("##")) {
+        const h = document.createElement("h");
+        h.textContent = raw.replace(/^#+\s*/, "");
+        view.append(h);
+      } else {
+        view.append(document.createTextNode(raw + "\n"));
+      }
+    }
+    const back = document.createElement("button");
+    back.className = "act";
+    back.textContent = "← 목록";
+    back.style.marginTop = "10px";
+    back.onclick = loadReports;
+    view.append(back);
+    switchTab("reports");
+  };
+
+  const loadReports = () => {
+    $("report-view").innerHTML = "";
+    $("report-list").style.display = "";
+    window.dapPalette.postMessage({ type: "loadReports" });
+  };
+
+  const switchTab = (name) => {
+    for (const tab of document.querySelectorAll(".tab")) {
+      tab.classList.toggle("on", tab.dataset.tab === name);
+    }
+    $("view-live").style.display = name === "live" ? "" : "none";
+    $("view-reports").style.display = name === "reports" ? "" : "none";
+    if (name === "reports" && !$("report-view").innerHTML) loadReports();
+  };
+
+  for (const tab of document.querySelectorAll(".tab")) {
+    tab.onclick = () => switchTab(tab.dataset.tab);
+  }
+  const sendLang = () =>
+    window.dapPalette.postMessage({
+      type: "setLang",
+      sourceLanguage: $("lang-src").value,
+      replyLanguage: $("lang-reply").value,
+    });
+  $("lang-src").onchange = sendLang;
+  $("lang-reply").onchange = sendLang;
+
+  $("toggle").onclick = () => window.dapPalette.postMessage({ type: running ? "stop" : "start" });
+  $("close").onclick = () => window.dapPalette.close();
+  $("summarize").onclick = () => {
+    $("summary").textContent = "요약 중…";
+    window.dapPalette.postMessage({ type: "summarize" });
+  };
+  for (const btn of document.querySelectorAll("[data-stance]")) {
+    btn.onclick = () => {
+      $("suggestion").innerHTML = '<div class="spin">답변 초안 생성 중…</div>';
+      window.dapPalette.postMessage({ type: "suggest", stance: btn.dataset.stance });
+    };
+  }
+
+  window.dapPalette.onMessage((msg) => {
+    if (msg.type === "init") {
+      setRunning(msg.running);
+      $("lines").innerHTML = "";
+      for (const line of msg.lines ?? []) addLine(line);
+      if (msg.lang) {
+        $("lang-src").value = msg.lang.sourceLanguage ?? "auto";
+        $("lang-reply").value = msg.lang.replyLanguage ?? "auto";
+      }
+    } else if (msg.type === "reset") {
+      $("lines").innerHTML = "";
+      $("msgs").innerHTML = "";
+      $("summary").textContent = "";
+      $("suggestion").innerHTML = "";
+    } else if (msg.type === "line") {
+      addLine(msg.line);
+    } else if (msg.type === "translation") {
+      const ko = document.querySelector("#line-" + msg.id + " .ko");
+      if (ko) { ko.textContent = msg.text; ko.style.display = ""; }
+    } else if (msg.type === "status") {
+      const state = msg.status?.state;
+      setRunning(state === "listening" || state === "starting");
+      if (state === "error" && msg.status.error) showMsg("error", msg.status.error);
+    } else if (msg.type === "notice") {
+      showMsg("notice", msg.message);
+    } else if (msg.type === "error") {
+      showMsg("error", msg.message);
+      setRunning(false);
+    } else if (msg.type === "summary") {
+      $("summary").textContent = msg.error ? "요약 실패: " + msg.error : msg.text;
+    } else if (msg.type === "suggestion") {
+      const box = $("suggestion");
+      if (msg.error) {
+        box.innerHTML = '<div class="error"></div>';
+        box.firstChild.textContent = msg.error;
+        return;
+      }
+      box.innerHTML =
+        '<div class="card"><div class="reply"></div><div class="ko"></div>' +
+        '<div class="tools"><button class="act" id="copy-reply">답변 복사</button></div></div>';
+      box.querySelector(".reply").textContent = msg.reply;
+      box.querySelector(".ko").textContent = msg.ko ?? "";
+      box.querySelector("#copy-reply").onclick = () =>
+        window.dapPalette.postMessage({ type: "copy", text: msg.reply });
+    } else if (msg.type === "reporting") {
+      setRunning(false);
+      showMsg("notice", "리포트 생성 중… (최대 2분)");
+    } else if (msg.type === "report") {
+      renderReport(msg.report);
+    } else if (msg.type === "reports") {
+      const list = $("report-list");
+      list.innerHTML = "";
+      const reports = msg.reports ?? [];
+      const drafts = msg.drafts ?? [];
+      if (reports.length === 0 && drafts.length === 0) {
+        list.innerHTML = '<div class="hint">저장된 리포트가 없어요.</div>';
+        return;
+      }
+      for (const item of drafts) {
+        const el = document.createElement("div");
+        el.className = "report-item";
+        el.textContent = `⚠ ${item.title} (${item.lineCount}줄)`;
+        const btn = document.createElement("button");
+        btn.className = "act";
+        btn.textContent = "리포트 재생성";
+        btn.style.marginLeft = "8px";
+        btn.onclick = (ev) => {
+          ev.stopPropagation();
+          btn.disabled = true;
+          btn.textContent = "생성 중…";
+          window.dapPalette.postMessage({ type: "regenReport", id: item.id });
+        };
+        el.append(btn);
+        list.append(el);
+      }
+      for (const item of reports) {
+        const el = document.createElement("div");
+        el.className = "report-item";
+        el.textContent = item.title;
+        el.onclick = () => window.dapPalette.postMessage({ type: "openReport", id: item.id });
+        list.append(el);
+      }
+    }
+  });
+
+  window.dapPalette.postMessage({ type: "ready" });
+</script>
