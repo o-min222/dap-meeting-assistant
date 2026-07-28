@@ -22,7 +22,7 @@ if (readFileSync(iconPath).length > 512 * 1024) {
 const manifest = readFileSync(manifestPath, "utf8");
 for (const expected of [
   "id: dap.meeting_assistant",
-  "version: 1.0.2",
+  "version: 1.0.3",
   "entry: dap_meeting_assistant.plugin:activate",
   "min_app_version: 1.3.12",
   "  - meeting.capture",
