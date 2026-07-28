@@ -29,7 +29,7 @@ if (icon.length > 512 * 1024) {
 const manifest = readFileSync(manifestPath, "utf8");
 for (const expected of [
   "id: dap.meeting_assistant",
-  "version: 1.0.4",
+  "version: 1.0.5",
   "entry: dap_meeting_assistant.plugin:activate",
   "min_app_version: 1.3.12",
   "  - meeting.capture",
@@ -46,6 +46,34 @@ const pluginModule = await import(pathToFileURL(modulePath).href);
 if (typeof pluginModule.activate !== "function") throw new Error("activate export is missing");
 
 const contributions = [];
+const actions = new Map();
+const paletteMessages = [];
+const captureSources = [];
+let paletteReceive = null;
+let statusListener = null;
+const meeting = {
+  capabilities() {
+    return { available: true, sources: ["both", "microphone", "system"] };
+  },
+  onStatus(callback) {
+    statusListener = callback;
+    return () => {};
+  },
+  onTranscript() {
+    return () => {};
+  },
+  async start(options) {
+    captureSources.push(options.source);
+    statusListener?.({ state: "starting", source: options.source });
+    if (options.source === "both") {
+      statusListener?.({ state: "error", source: options.source, error: "Permission denied" });
+      throw new Error("Permission denied");
+    }
+    const status = { state: "listening", source: options.source, sessionId: "smoke-session" };
+    statusListener?.(status);
+    return status;
+  },
+};
 const cleanup = pluginModule.activate({
   pluginId: "dap.meeting_assistant",
   host: {
@@ -53,8 +81,21 @@ const cleanup = pluginModule.activate({
     clipboard: { writeText() {} },
     llm: { async generate() { return ""; } },
     settings: { values() { return {}; }, set() {} },
-    storage: {},
-    windows: {},
+    storage: {
+      async getJson() { return null; },
+      async setJson() {},
+    },
+    meeting,
+    windows: {
+      openPalette() {
+        return {
+          isDestroyed() { return false; },
+          toggle() {},
+          onMessage(callback) { paletteReceive = callback; },
+          postMessage(message) { paletteMessages.push(message); },
+        };
+      },
+    },
   },
   settings: {
     registerSettingsSection(value) {
@@ -63,6 +104,7 @@ const cleanup = pluginModule.activate({
   },
   actions: {
     registerAction(value) {
+      actions.set(value.id, value.callback);
       contributions.push(["action", value.id]);
     },
   },
@@ -88,5 +130,21 @@ if (JSON.stringify(contributions) !== JSON.stringify(expectedContributions)) {
   throw new Error(`unexpected contributions: ${JSON.stringify(contributions)}`);
 }
 if (typeof cleanup !== "function") throw new Error("activate must return a cleanup function");
+
+actions.get("openMeetingAssistant")?.();
+paletteReceive?.({ type: "ready" });
+paletteReceive?.({ type: "start" });
+for (let i = 0; captureSources.length < 2 && i < 20; i++) {
+  await new Promise((resolve) => setTimeout(resolve, 0));
+}
+if (JSON.stringify(captureSources) !== JSON.stringify(["both", "microphone"])) {
+  throw new Error(`capture fallback did not retry microphone: ${JSON.stringify(captureSources)}`);
+}
+if (paletteMessages.some((message) => message.type === "error")) {
+  throw new Error(`transient capture failure leaked as a final error: ${JSON.stringify(paletteMessages)}`);
+}
+if (!paletteMessages.some((message) => message.type === "notice" && message.message.includes("마이크 전용"))) {
+  throw new Error("microphone fallback notice is missing");
+}
 
 console.log("✓ meeting assistant plugin contract and activation smoke passed");

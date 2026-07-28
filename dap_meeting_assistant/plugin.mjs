@@ -14,6 +14,7 @@ export function activate(ctx) {
   let offStatus = null;
   let offTranscript = null;
   let running = false;
+  let startingCapture = false;
   let sessionId = null;
   let startedAt = 0;
   let lines = []; // { id, speaker: "me"|"peer", text, ts, translation? }
@@ -208,11 +209,9 @@ export function activate(ctx) {
       post({ type: "error", message });
       return;
     }
-    const source = cap.sources.includes("both")
-      ? "both"
-      : cap.sources.includes("system")
-        ? "system"
-        : "microphone";
+    const sourceCandidates = cap.sources.includes("both")
+      ? ["both", ...["microphone", "system"].filter((source) => cap.sources.includes(source))]
+      : ["microphone", "system"].filter((source) => cap.sources.includes(source));
     const v = settingsValues();
     lines = [];
     nextLineId = 1;
@@ -221,13 +220,32 @@ export function activate(ctx) {
     try {
       offStatus?.();
       offTranscript?.();
-      offStatus = meeting.onStatus((status) => post({ type: "status", status }));
-      offTranscript = meeting.onTranscript(onTranscript);
-      const status = await meeting.start({
-        source,
-        sourceLanguage: v.sourceLanguage === "auto" ? undefined : v.sourceLanguage,
-        targetLanguage: v.targetLanguage,
+      startingCapture = true;
+      offStatus = meeting.onStatus((status) => {
+        // A failed preferred source is retried below. Do not render that transient failure as a
+        // duplicate final error while a usable microphone/system source may still start.
+        if (startingCapture && status?.state === "error") return;
+        post({ type: "status", status });
       });
+      offTranscript = meeting.onTranscript(onTranscript);
+      let status = null;
+      let source = null;
+      let lastError = null;
+      for (const candidate of sourceCandidates) {
+        try {
+          status = await meeting.start({
+            source: candidate,
+            sourceLanguage: v.sourceLanguage === "auto" ? undefined : v.sourceLanguage,
+            targetLanguage: v.targetLanguage,
+          });
+          source = candidate;
+          break;
+        } catch (error) {
+          lastError = error;
+        }
+      }
+      if (!status || !source) throw lastError ?? new Error("회의 캡처를 시작할 수 없어요.");
+      startingCapture = false;
       running = true;
       sessionId = status.sessionId ?? String(Date.now());
       startedAt = Date.now();
@@ -248,10 +266,16 @@ export function activate(ctx) {
       if (source === "microphone") {
         post({
           type: "notice",
-          message: "지금은 마이크만 캡처해요 — 상대방 음성(시스템 오디오)은 이 환경에서 사용할 수 없어요.",
+          message: "마이크 전용으로 시작했어요 — 상대방 음성(시스템 오디오)은 현재 사용할 수 없어요.",
+        });
+      } else if (source === "system") {
+        post({
+          type: "notice",
+          message: "시스템 오디오 전용으로 시작했어요 — 내 마이크 음성은 현재 사용할 수 없어요.",
         });
       }
     } catch (error) {
+      startingCapture = false;
       running = false;
       post({ type: "error", message: String(error?.message ?? error) });
     }
