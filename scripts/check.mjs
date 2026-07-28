@@ -14,9 +14,9 @@ for (const file of [manifestPath, modulePath, palettePath]) {
 const manifest = readFileSync(manifestPath, "utf8");
 for (const expected of [
   "id: dap.meeting_assistant",
-  "version: 1.0.1",
+  "version: 1.0.2",
   "entry: dap_meeting_assistant.plugin:activate",
-  "min_app_version: 1.3.11",
+  "min_app_version: 1.3.12",
   "  - meeting.capture",
   "  - storage.private",
   "  - window.palette",

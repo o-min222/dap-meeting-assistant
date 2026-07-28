@@ -23,7 +23,7 @@ DAP의 `설정 → 플러그인`에서 **Meeting Assistant**를 찾아 설치합
 - `storage.private`: 회의 초안과 리포트 저장
 - `window.palette`: 회의 패널 표시
 
-DAP 1.3.11 이상이 필요합니다. 회의 전사에는 DAP 설정에서 설치한 Whisper `small` 모델과
+DAP 1.3.12 이상이 필요합니다. 회의 전사에는 DAP 설정에서 설치한 Whisper `small` 모델과
 `whisper-server` 또는 `whisper-cli`가 필요합니다.
 
 ## 개인정보와 동의
