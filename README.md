@@ -1,5 +1,7 @@
 # DAP Meeting Assistant
 
+<img src="./assets/icon.svg" alt="DAP Meeting Assistant 아이콘" width="112" height="112">
+
 DAP(Desk AI Pet)용 외부 회의 도우미 플러그인입니다.
 
 회의 중 마이크와 시스템 오디오를 전사하고, 실시간 번역 자막과 상황별 답변 초안을 제공합니다.
