@@ -1,6 +1,6 @@
 # DAP Meeting Assistant
 
-<img src="./assets/icon.svg" alt="DAP Meeting Assistant 아이콘" width="112" height="112">
+<img src="./assets/icon.png" alt="DAP Meeting Assistant 아이콘" width="112" height="112">
 
 DAP(Desk AI Pet)용 외부 회의 도우미 플러그인입니다.
 
