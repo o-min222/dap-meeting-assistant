@@ -6,9 +6,17 @@ const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const manifestPath = resolve(root, "plugin.yaml");
 const modulePath = resolve(root, "dap_meeting_assistant/plugin.mjs");
 const palettePath = resolve(root, "palette/index.html");
+const iconPath = resolve(root, "assets/icon.svg");
 
-for (const file of [manifestPath, modulePath, palettePath]) {
+for (const file of [manifestPath, modulePath, palettePath, iconPath]) {
   if (!existsSync(file)) throw new Error(`required plugin file is missing: ${file}`);
+}
+const icon = readFileSync(iconPath, "utf8");
+if (!icon.includes("<svg") || !icon.includes('viewBox="0 0 64 64"')) {
+  throw new Error("assets/icon.svg must be a 64 × 64 SVG icon");
+}
+if (readFileSync(iconPath).length > 512 * 1024) {
+  throw new Error("assets/icon.svg exceeds the DAP radial icon size limit");
 }
 
 const manifest = readFileSync(manifestPath, "utf8");
@@ -53,7 +61,7 @@ const cleanup = pluginModule.activate({
   },
   radialMenu: {
     addItem(value) {
-      contributions.push(["radial", value.itemId]);
+      contributions.push(["radial", value.itemId, value.icon]);
     },
   },
   trayMenu: {
@@ -66,7 +74,7 @@ const cleanup = pluginModule.activate({
 const expectedContributions = [
   ["settings", "general"],
   ["action", "openMeetingAssistant"],
-  ["radial", "meeting"],
+  ["radial", "meeting", "assets/icon.svg"],
   ["tray", "open"],
 ];
 if (JSON.stringify(contributions) !== JSON.stringify(expectedContributions)) {

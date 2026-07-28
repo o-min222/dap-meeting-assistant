@@ -458,6 +458,7 @@ export function activate(ctx) {
     label: "회의 도우미",
     actionId: "openMeetingAssistant",
     priority: 60,
+    icon: "assets/icon.svg",
   });
   ctx.trayMenu.addItem({
     itemId: "open",
